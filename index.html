@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Endless Audio Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        /* Custom scrollbar for playlist */
+        .playlist-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .playlist-scroll::-webkit-scrollbar-track {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        .playlist-scroll::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        .playlist-scroll::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-700 flex flex-col h-[600px] max-h-screen">
+        
+        <!-- Header & File Input -->
+        <div class="p-6 pb-4 border-b border-slate-700 shrink-0">
+            <h1 class="text-xl font-bold mb-4 flex items-center gap-2 text-indigo-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                Endless Loop Player
+            </h1>
+            
+            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-600 border-dashed rounded-lg cursor-pointer bg-slate-700/50 hover:bg-slate-700/80 hover:border-indigo-400 transition-colors">
+                <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                    <svg class="w-8 h-8 mb-2 text-slate-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                    </svg>
+                    <p class="mb-2 text-sm text-slate-300"><span class="font-semibold">クリックして音声ファイルを追加</span></p>
+                    <p class="text-xs text-slate-500">WAV, MP3, M4A など (複数選択可)</p>
+                </div>
+                <input type="file" id="file-input" class="hidden" multiple accept="audio/*" />
+            </label>
+        </div>
+
+        <!-- Playlist -->
+        <div class="flex-1 overflow-y-auto playlist-scroll p-4" id="playlist-container">
+            <div id="empty-state" class="h-full flex flex-col items-center justify-center text-slate-500 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mb-3 opacity-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                ファイルが追加されていません
+            </div>
+            <ul id="playlist" class="space-y-1">
+                <!-- Playlist items will be injected here -->
+            </ul>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-slate-900 p-4 border-t border-slate-700 shrink-0">
+            <!-- Progress -->
+            <div class="mb-4">
+                <div class="flex justify-between text-xs text-slate-400 mb-1 font-mono">
+                    <span id="time-current">0:00</span>
+                    <span id="time-total">0:00</span>
+                </div>
+                <div class="w-full bg-slate-700 rounded-full h-1.5 cursor-pointer relative" id="progress-container">
+                    <div class="bg-indigo-500 h-1.5 rounded-full w-0 pointer-events-none transition-all duration-75" id="progress-bar"></div>
+                </div>
+                <div class="truncate text-sm font-medium mt-3 text-center text-slate-200" id="now-playing-title">
+                    ---
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex items-center justify-center gap-6">
+                <button id="btn-prev" class="text-slate-400 hover:text-white transition-colors p-2 disabled:opacity-30 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                </button>
+
+                <button id="btn-play-pause" class="w-14 h-14 bg-indigo-500 hover:bg-indigo-400 text-white rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
+                    <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 ml-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+
+                <button id="btn-next" class="text-slate-400 hover:text-white transition-colors p-2 disabled:opacity-30 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Toast -->
+    <div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm transition-opacity duration-300 opacity-0 pointer-events-none border border-slate-700 z-50">
+    </div>
+
+    <script>
+        // State
+        let tracks = [];
+        let currentIndex = -1;
+        let isPlaying = false;
+        
+        // DOM Elements
+        const audio = new Audio();
+        const fileInput = document.getElementById('file-input');
+        const playlistEl = document.getElementById('playlist');
+        const emptyState = document.getElementById('empty-state');
+        const btnPlayPause = document.getElementById('btn-play-pause');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        const iconPlay = document.getElementById('icon-play');
+        const iconPause = document.getElementById('icon-pause');
+        const nowPlayingTitle = document.getElementById('now-playing-title');
+        const progressBar = document.getElementById('progress-bar');
+        const progressContainer = document.getElementById('progress-container');
+        const timeCurrent = document.getElementById('time-current');
+        const timeTotal = document.getElementById('time-total');
+        const toast = document.getElementById('toast');
+
+        // Initial setup
+        updateControlsState();
+
+        // Event Listeners
+        fileInput.addEventListener('change', handleFileSelect);
+        btnPlayPause.addEventListener('click', togglePlayPause);
+        btnNext.addEventListener('click', playNext);
+        btnPrev.addEventListener('click', playPrev);
+        
+        audio.addEventListener('timeupdate', updateProgress);
+        audio.addEventListener('loadedmetadata', updateDuration);
+        audio.addEventListener('ended', playNext); // Endless loop trigger
+        audio.addEventListener('error', (e) => {
+            showToast("音声ファイルの読み込みに失敗しました。");
+            playNext();
+        });
+
+        progressContainer.addEventListener('click', seekTo);
+
+        // Functions
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files).filter(file => file.type.startsWith('audio/'));
+            
+            if (files.length === 0) return;
+
+            // Optional: keep existing tracks or clear? Let's append them.
+            // If you want to clear on new selection, uncomment the next line:
+            // clearPlaylist();
+
+            files.forEach(file => {
+                const url = URL.createObjectURL(file);
+                tracks.push({
+                    name: file.name,
+                    url: url,
+                    file: file
+                });
+            });
+
+            renderPlaylist();
+            
+            // If nothing is playing, start the first new track
+            if (currentIndex === -1 && tracks.length > 0) {
+                currentIndex = 0;
+                loadTrack(currentIndex);
+            }
+
+            updateControlsState();
+            fileInput.value = ''; // Reset input
+            showToast(`${files.length}曲追加されました`);
+        }
+
+        function renderPlaylist() {
+            if (tracks.length > 0) {
+                emptyState.style.display = 'none';
+            }
+
+            playlistEl.innerHTML = '';
+            tracks.forEach((track, index) => {
+                const li = document.createElement('li');
+                li.className = `p-3 rounded-lg cursor-pointer flex items-center gap-3 transition-colors ${index === currentIndex ? 'bg-indigo-500/20 text-indigo-300' : 'hover:bg-slate-700 text-slate-300'}`;
+                
+                // Add index number
+                const num = document.createElement('span');
+                num.className = `text-xs w-5 text-right font-mono ${index === currentIndex ? 'text-indigo-400' : 'text-slate-500'}`;
+                num.textContent = index + 1;
+
+                const name = document.createElement('span');
+                name.className = 'truncate flex-1 text-sm font-medium';
+                name.textContent = track.name;
+
+                li.appendChild(num);
+                li.appendChild(name);
+
+                li.addEventListener('click', () => {
+                    currentIndex = index;
+                    loadTrack(currentIndex);
+                    playAudio();
+                });
+
+                playlistEl.appendChild(li);
+            });
+        }
+
+        function loadTrack(index) {
+            if (tracks.length === 0 || index < 0 || index >= tracks.length) return;
+            
+            const track = tracks[index];
+            audio.src = track.url;
+            nowPlayingTitle.textContent = track.name;
+            renderPlaylist(); // Update highlighting
+        }
+
+        function togglePlayPause() {
+            if (tracks.length === 0) return;
+            if (isPlaying) {
+                pauseAudio();
+            } else {
+                playAudio();
+            }
+        }
+
+        function playAudio() {
+            if (!audio.src) return;
+            const playPromise = audio.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.then(_ => {
+                    isPlaying = true;
+                    updatePlayPauseUI();
+                }).catch(error => {
+                    console.error("Playback prevented:", error);
+                    isPlaying = false;
+                    updatePlayPauseUI();
+                });
+            }
+        }
+
+        function pauseAudio() {
+            audio.pause();
+            isPlaying = false;
+            updatePlayPauseUI();
+        }
+
+        function playNext() {
+            if (tracks.length === 0) return;
+            // Endless loop logic: go to first track if at the end
+            currentIndex = (currentIndex + 1) % tracks.length;
+            loadTrack(currentIndex);
+            playAudio();
+        }
+
+        function playPrev() {
+            if (tracks.length === 0) return;
+            // Endless loop logic backwards
+            currentIndex = (currentIndex - 1 + tracks.length) % tracks.length;
+            loadTrack(currentIndex);
+            playAudio();
+        }
+
+        function updatePlayPauseUI() {
+            if (isPlaying) {
+                iconPlay.classList.add('hidden');
+                iconPause.classList.remove('hidden');
+            } else {
+                iconPlay.classList.remove('hidden');
+                iconPause.classList.add('hidden');
+            }
+        }
+
+        function updateControlsState() {
+            const hasTracks = tracks.length > 0;
+            btnPlayPause.disabled = !hasTracks;
+            btnPrev.disabled = !hasTracks;
+            btnNext.disabled = !hasTracks;
+        }
+
+        function updateProgress() {
+            if (audio.duration) {
+                const percent = (audio.currentTime / audio.duration) * 100;
+                progressBar.style.width = `${percent}%`;
+                timeCurrent.textContent = formatTime(audio.currentTime);
+            }
+        }
+
+        function updateDuration() {
+            timeTotal.textContent = formatTime(audio.duration);
+            timeCurrent.textContent = formatTime(0);
+            progressBar.style.width = '0%';
+        }
+
+        function seekTo(e) {
+            if (!audio.duration) return;
+            const rect = progressContainer.getBoundingClientRect();
+            const pos = (e.clientX - rect.left) / progressContainer.offsetWidth;
+            audio.currentTime = pos * audio.duration;
+        }
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "0:00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.remove('opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+            }, 3000);
+        }
+
+    </script>
+</body>
+</html>
